@@ -17,7 +17,6 @@
   BSD license, all text above must be included in any redistribution
  ***************************************************************************/
 
-#include "Arduino_GFX_Library.h"
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_ST7789.h> // Hardware-specific library
 #include <SPI.h>
@@ -43,9 +42,15 @@
 //high range of the sensor (this will be red on the screen)
 #define MAXTEMP 34
 
+// Arduino_DataBus *bus = new Arduino_ESP32SPI(LCD_DC, LCD_CS, LCD_SCLK, LCD_MOSI);
+
+//Arduino_GFX *gfx = new Arduino_ST7789(bus, LCD_RST /* RST */, 0 /* rotation */, true /* IPS */, SCREEN_WIDTH, SCREEN_HEIGHT, 52, 40, 0, 0);
+
+Adafruit_ST7789 tft = Adafruit_ST7789(LCD_CS, LCD_DC, LCD_RST);
+
 const int HUMAN_TEMP = 23;
 
-const uint16_t TEXT_COLOR = gfx->color565(255, 125, 242);
+const uint16_t TEXT_COLOR = tft.color565(255, 125, 242);
 
 //const String lines[6] = {
 //"   ____  _                   _ _                _    _____      ",
@@ -63,6 +68,7 @@ const String lines[6] = {
 " \\ \\__,_|_|\\_\\__,_|\\__|_| |_|\\__, |_| |_|",
 "  \\____/                     |___/       "
 };
+const int linesLen = sizeof(lines) / sizeof(lines[0]);
 const String website = "katherinenayan.com ";
 
 //the colors we will be using
@@ -94,12 +100,6 @@ const uint16_t camColors[] = {0x480F,
 0xF1E0,0xF1C0,0xF1A0,0xF180,0xF160,0xF140,0xF100,0xF0E0,0xF0C0,0xF0A0,
 0xF080,0xF060,0xF040,0xF020,0xF800,};
 
-Arduino_DataBus *bus = new Arduino_ESP32SPI(LCD_DC, LCD_CS, LCD_SCLK, LCD_MOSI);
-
-Arduino_GFX *gfx = new Arduino_ST7789(bus, LCD_RST /* RST */, 0 /* rotation */, true /* IPS */, SCREEN_WIDTH, SCREEN_HEIGHT, 52, 40, 0, 0);
-
-Adafruit_ST7789 tft = Adafruit_ST7789(LCD_CS, LCD_DC, LCD_RST);
-
 Adafruit_AMG88xx amg;
 unsigned long delayTime;
 float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
@@ -107,67 +107,63 @@ uint16_t displayPixelWidth = SCREEN_HEIGHT / 8;
 uint16_t displayPixelHeight = SCREEN_WIDTH / 8;
 
 void setup() {
-  Serial.begin(9600);
-  Serial.println(F("AMG88xx thermal camera!"));
+  // Serial.begin(9600);
+  // Serial.println(F("AMG88xx thermal camera!"));
   
 //  // Initialize the button pin
 //  pinMode(BUTTON_PIN, INPUT_PULLUP);
 //  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), handleButtonPress, RISING);
 
   Serial.begin(115200);
-  // Serial.setDebugOutput(true);
-  // while(!Serial);
-  //Serial.println("WiFi Viz");
 
-#ifdef GFX_EXTRA_PRE_INIT
-  GFX_EXTRA_PRE_INIT();
-#endif
+// #ifdef GFX_EXTRA_PRE_INIT
+//   GFX_EXTRA_PRE_INIT();
+// #endif
 
 #if defined(LCD_PWR_PIN)
   pinMode(LCD_PWR_PIN, OUTPUT);     // sets the pin as output
   digitalWrite(LCD_PWR_PIN, HIGH);  // power on
 #endif
 
-  // Init Display
-  if (!gfx->begin()) {
-    Serial.println("gfx->begin() failed!");
-  }
-//  w = gfx->width();
-//  h = gfx->height();
-  pinMode(LCD_BLK, OUTPUT);
-  digitalWrite(LCD_BLK, HIGH);
-  gfx->fillScreen(BLACK);
-  // init banner
+  // // Init Display
+  tft.init(SCREEN_WIDTH, SCREEN_HEIGHT);
+  // tft.setTextWrap(false);
+  tft.fillScreen(ST77XX_BLACK);
+  
   //Set screen rotation in lanscape mode
-  gfx->setRotation(1);
-  gfx->setTextSize(1.5);
-  gfx->setTextColor(WHITE);
-  gfx->setCursor(0, 60);
-  gfx->print("Instructions and Source Code\nAvailable at:");
-  gfx->setCursor(0, 80);
-  gfx->setTextSize(2);
-  gfx->setTextColor(GREEN);
-  gfx->print("Polarity.io/Shmoo");
-  // Add in my name
-  gfx->setCursor(0, 100);
-  gfx->setTextSize(1.5);
-  gfx->setTextColor(WHITE);
-  gfx->print("With modifications by:");
-  gfx->setCursor(0, 110);
-  gfx->setTextSize(2);
-  gfx->setTextColor(GREEN);
-  gfx->print("@bradhack3r");
-  delay(2000);
-  gfx->fillScreen(BLACK);
+  tft.setRotation(-1);
+
+  // // init banner
+  // tft.setTextSize(1.5);
+  // tft.setTextColor(ST77XX_WHITE);
+  // tft.setCursor(0, 60);
+  // tft.print("Instructions and Source Code\nAvailable at:");
+  // tft.setCursor(0, 80);
+  // tft.setTextSize(2);
+  // tft.setTextColor(ST77XX_GREEN);
+  // tft.print("Polarity.io/Shmoo");
+  // // Add in my name
+  // tft.setCursor(0, 100);
+  // tft.setTextSize(1.5);
+  // tft.setTextColor(ST77XX_WHITE);
+  // tft.print("With modifications by:");
+  // tft.setCursor(0, 110);
+  // tft.setTextSize(2);
+  // tft.setTextColor(ST77XX_GREEN);
+  // tft.print("@bradhack3r");
+  // delay(2000);
+  // tft.fillScreen(ST77XX_BLACK);
 
   bool status;
   // default settings
   status = amg.begin();
-  if (!status) {
-    gfx->setTextSize(1);
-    gfx->setTextColor(WHITE);
-    gfx->print("Could not find a valid AMG88xx sensor, check wiring!");
-    while (1);
+  while (!status) {
+    tft.setCursor(0, 0);
+    tft.setTextSize(1.5);
+    tft.setTextColor(ST77XX_WHITE);
+    tft.print("Could not find a valid AMG88xx sensor, check wiring!");
+    delay(100);
+    status = amg.begin();
   }
   
   Serial.println("-- Thermal Camera Test --");
@@ -176,7 +172,7 @@ void setup() {
 
 void loop() {
   float avgPixel = getTempAvg();
-  Serial.printf("Avg pixel val: %f\n", avgPixel);
+  // Serial.printf("Avg pixel val: %f\n", avgPixel);
   
 
   // Check if a human is detected
@@ -204,7 +200,7 @@ void showThermalGrid() {
     colorIndex = (uint8_t)constrain((int16_t)colorIndex, (int16_t)0, (int16_t)255);
 
     //draw the pixels!
-    gfx->fillRect(displayPixelHeight * floor(i / 8), displayPixelWidth * (i % 8),
+    tft.fillRect(displayPixelHeight * floor(i / 8), displayPixelWidth * (i % 8),
       displayPixelHeight, displayPixelWidth, camColors[colorIndex]);
     pixelSum += pixels[i];
   }
@@ -227,12 +223,12 @@ float getTempAvg() {
 
 void displayHelloMsg() {
   // Clear the display
-  gfx->fillScreen(BLACK);
+  tft.fillScreen(ST77XX_BLACK);
   // Write Hello to screen
-  gfx->setCursor(0, 60);
-  gfx->setTextSize(2);
-  gfx->setTextColor(WHITE);
-  gfx->print("Hi, I'm Kat!");
+  tft.setCursor(0, 60);
+  tft.setTextSize(2);
+  tft.setTextColor(ST77XX_WHITE);
+  tft.print("Hi, I'm Kat!");
 }
 
 int cursor = 0;
@@ -240,28 +236,36 @@ int websiteCursor = 0;
 int fontSize = 0.5;
 int lineSpacing = 12;
 int kerning = 8;
+int websiteKerning = 12;
+int gapSpacing = 6;
+// Gap is to make the text centered
+int gap = (SCREEN_WIDTH - (lineSpacing * (linesLen + 1)) - gapSpacing) / 2;
 
 const int asciiWidth = lines[0].length();
 const int websiteWidth = website.length();
 
 void displayASCIIName() {
   // Clear the screen
-  gfx->fillScreen(BLACK);
+  tft.fillScreen(ST77XX_BLACK);
   // Set text settings
-  gfx->setTextColor(TEXT_COLOR);
-  gfx->setTextSize(2);
-  // Draw characters
-  for (int i = 0; i < 6; i++) {
-    for (int j = 0; j < 29; j++) {
-      gfx->setCursor(j * kerning, 60 + i * lineSpacing);
-      gfx->print(lines[i][(j + cursor) % asciiWidth]);
-    }
-  }
+  tft.setTextColor(TEXT_COLOR);
+  tft.setTextSize(2);
   // Draw website scrolling
-  for (int j = 0; j < 29; j++) {
-    gfx->setCursor(j * kerning, 55);
-    gfx->setTextSize(2);
-    gfx->print(website[((j + websiteCursor - 1) + websiteWidth) % websiteWidth]);
+  for (int j = 0; j < SCREEN_HEIGHT / websiteKerning - 1; j++) {
+    tft.setCursor(j * (websiteKerning), gap);
+    tft.setTextSize(2);
+    tft.print(website[((j + websiteCursor - 1) + websiteWidth) % websiteWidth]);
+  }
+  // Draw characters
+  for (int i = 0; i < linesLen; i++) {
+    // Gap + a little bit of gap (gapSpacing) + offset of 1 lineSpace for website row
+    int yOffset = gap + gapSpacing + lineSpacing + (i * lineSpacing);
+    Serial.println("yOffset" + yOffset);
+    for (int j = 0; j < SCREEN_HEIGHT / kerning - 1; j++) {
+      int xOffset = j * kerning;
+      tft.setCursor(xOffset, yOffset);
+      tft.print(lines[i][(j + cursor) % asciiWidth]);
+    }
   }
   cursor = (cursor + 1) % asciiWidth;
   websiteCursor = (websiteCursor - 1) % websiteWidth;
